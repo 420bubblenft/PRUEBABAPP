@@ -715,3 +715,14 @@ input:focus, select:focus, textarea:focus {
   }
   .print-hide { display: none !important; }
 }
+
+/* Bloquea el zoom automático del iPhone en inputs y selectores */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input, 
+select, 
+textarea {
+    font-size: 16px !important;
+}
+
