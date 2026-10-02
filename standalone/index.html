@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedControl Doctor - Portal Clínico y Registro de Pacientes</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase SDKs (Compat version for pure browser vanilla JS) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Toast Feedback -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- AUTHENTICATION VIEW -->
+  <div id="authView" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-icon">🩺</div>
+        <h1>MedControl <span class="badge-role">DOCTOR</span></h1>
+        <p>Portal Privado del Médico Administrador</p>
+      </div>
+
+      <div id="authAlert" class="alert-box hidden"></div>
+
+      <!-- Google Sign-in -->
+      <button type="button" id="btnGoogleLogin" class="btn-google">
+        <svg class="google-icon" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.97 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+        </svg>
+        <span>Ingresar con Google (Firebase Nube)</span>
+      </button>
+
+      <div class="divider"><span>o correo y contraseña</span></div>
+
+      <!-- Email / Password Form -->
+      <form id="emailLoginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginEmail">Correo Electrónico</label>
+          <input type="email" id="loginEmail" value="joelvalenzuela0999@gmail.com" required placeholder="doctor@ejemplo.com">
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">Contraseña de Firebase</label>
+          <div class="password-input-wrapper">
+            <input type="password" id="loginPassword" required placeholder="Mínimo 6 caracteres">
+            <button type="button" id="btnTogglePassword" class="btn-toggle-eye">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" id="btnSubmitAuth" class="btn-primary">
+          Iniciar Sesión (signInWithEmailAndPassword)
+        </button>
+
+        <div class="form-toggle-mode">
+          <button type="button" id="btnToggleRegisterMode" class="btn-link">
+            ¿Primera vez? Crear cuenta de Administrador en Firebase
+          </button>
+        </div>
+      </form>
+
+      <div class="auth-footer">
+        <span>Conectado a Firebase: <strong>pruebafinal-9704d</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION VIEW -->
+  <div id="mainView" class="main-wrapper hidden">
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="nav-container">
+        <div class="brand">
+          <span class="brand-logo">🩺</span>
+          <div>
+            <div class="brand-title">
+              <strong>MedControl</strong>
+              <span class="tag-badge">PORTAL MÉDICO</span>
+              <span id="navCloudBadge" class="cloud-badge hidden">☁️ FIREBASE CONECTADO</span>
+            </div>
+            <div class="brand-subtitle" id="navDoctorInfo">Dr. Joel Valenzuela · Administrador Único</div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <button id="btnOpenNewPatientModal" class="btn-primary-sm">+ Registrar Paciente</button>
+          <button id="btnExportCsv" class="btn-secondary-sm">Exportar CSV</button>
+          <button id="btnLogout" class="btn-danger-sm">Cerrar Sesión</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="content-container">
+      <!-- Status Card for Cloud Sync -->
+      <div id="cloudBanner" class="cloud-banner">
+        <div class="cloud-info">
+          <span class="cloud-icon">☁️</span>
+          <div>
+            <strong id="cloudStatusText">Firebase Firestore Activo</strong>
+            <p id="cloudSubText">Proyecto: pruebafinal-9704d</p>
+          </div>
+        </div>
+        <div class="cloud-actions">
+          <button id="btnSyncCloud" class="btn-sync">Subir Pacientes a Firebase</button>
+          <a href="https://console.firebase.google.com/project/pruebafinal-9704d/firestore" target="_blank" class="btn-link-console">Ver en Consola ↗</a>
+        </div>
+      </div>
+
+      <!-- Clinical Metrics -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">TOTAL PACIENTES</span>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">TRATAMIENTOS ACTIVOS</span>
+          <div class="stat-value text-emerald" id="statActive">0</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">EN OBSERVACIÓN</span>
+          <div class="stat-value text-amber" id="statObs">0</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">REGISTROS DE DOSIS</span>
+          <div class="stat-value text-cyan" id="statDoses">0</div>
+        </div>
+      </div>
+
+      <!-- Search and Filter Bar -->
+      <div class="filter-bar">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Buscar por nombre, ID de registro, teléfono o medicamento...">
+        </div>
+        <div class="status-filters">
+          <button class="filter-btn active" data-filter="all">Todos</button>
+          <button class="filter-btn" data-filter="activo">Activos</button>
+          <button class="filter-btn" data-filter="en_observacion">Observación</button>
+        </div>
+      </div>
+
+      <!-- Patients Table -->
+      <div class="table-card">
+        <div class="table-responsive">
+          <table class="patients-table">
+            <thead>
+              <tr>
+                <th>ID Registro</th>
+                <th>Paciente</th>
+                <th>Teléfono</th>
+                <th>Medicamento</th>
+                <th>Cantidad Suministrada</th>
+                <th>Estado</th>
+                <th class="text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="patientsTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- PATIENT FORM MODAL (NEW / EDIT) -->
+  <div id="patientModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalTitle">Registrar Nuevo Paciente</h3>
+        <button type="button" class="btn-close" id="btnClosePatientModal">&times;</button>
+      </div>
+      <form id="patientForm" class="modal-body">
+        <input type="hidden" id="editPatientId">
+
+        <h4 class="section-title">1. Identificación y Contacto</h4>
+        <div class="grid-3">
+          <div class="form-group">
+            <label for="regId">ID de Registro *</label>
+            <input type="text" id="regId" required placeholder="ej. PAC-2026-001">
+          </div>
+          <div class="form-group">
+            <label for="firstName">Nombres *</label>
+            <input type="text" id="firstName" required placeholder="ej. Carlos Eduardo">
+          </div>
+          <div class="form-group">
+            <label for="lastName">Apellidos *</label>
+            <input type="text" id="lastName" required placeholder="ej. Hernández Morales">
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="form-group">
+            <label for="phone">Teléfono *</label>
+            <input type="tel" id="phone" required placeholder="ej. +52 55 1234 5678">
+          </div>
+          <div class="form-group">
+            <label for="age">Edad</label>
+            <input type="number" id="age" min="0" max="120" placeholder="ej. 58">
+          </div>
+          <div class="form-group">
+            <label for="gender">Género</label>
+            <select id="gender">
+              <option value="Masculino">Masculino</option>
+              <option value="Femenino">Femenino</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="allergies">Alergias Conocidas</label>
+            <input type="text" id="allergies" placeholder="ej. Penicilina, Sulfas o Ninguna">
+          </div>
+          <div class="form-group">
+            <label for="diagnosis">Diagnóstico / Motivo</label>
+            <input type="text" id="diagnosis" placeholder="ej. Hipertensión Arterial">
+          </div>
+        </div>
+
+        <h4 class="section-title">2. Medicamento y Cantidad Suministrada</h4>
+        <div class="grid-3">
+          <div class="form-group">
+            <label for="medName">Nombre del Medicamento *</label>
+            <input type="text" id="medName" required placeholder="ej. Losartán Potásico">
+          </div>
+          <div class="form-group">
+            <label for="medAmount">Cantidad Suministrada *</label>
+            <input type="number" step="any" min="0.01" id="medAmount" required placeholder="ej. 50">
+          </div>
+          <div class="form-group">
+            <label for="medUnit">Unidad de Medida</label>
+            <select id="medUnit">
+              <option value="mg">mg</option>
+              <option value="ml">ml</option>
+              <option value="mcg">mcg</option>
+              <option value="comprimidos">comprimidos</option>
+              <option value="gotas">gotas</option>
+              <option value="UI">UI</option>
+              <option value="ampollas">ampollas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="medFrequency">Frecuencia de Toma</label>
+            <input type="text" id="medFrequency" value="Cada 12 horas (2 veces al día)">
+          </div>
+          <div class="form-group">
+            <label for="medRoute">Vía de Administración</label>
+            <select id="medRoute">
+              <option value="Oral">Oral</option>
+              <option value="Intravenosa (IV)">Intravenosa (IV)</option>
+              <option value="Intramuscular (IM)">Intramuscular (IM)</option>
+              <option value="Subcutánea">Subcutánea</option>
+              <option value="Inhalatoria">Inhalatoria</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="medInstructions">Indicaciones al Paciente</label>
+          <textarea id="medInstructions" rows="2" placeholder="ej. Tomar con medio vaso de agua después del desayuno."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="btnCancelPatient">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar Paciente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DOSAGE UPDATE MODAL -->
+  <div id="dosageModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-sm">
+      <div class="modal-header">
+        <h3>Modificar Dosis Suministrada</h3>
+        <button type="button" class="btn-close" id="btnCloseDosageModal">&times;</button>
+      </div>
+      <form id="dosageForm" class="modal-body">
+        <input type="hidden" id="dosagePatientId">
+        <div class="current-dose-box">
+          <span class="label">Dosis Actual:</span>
+          <strong id="dosageCurrentText">--</strong>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="newAmount">Nueva Cantidad *</label>
+            <input type="number" step="any" min="0.01" id="newAmount" required placeholder="ej. 75">
+          </div>
+          <div class="form-group">
+            <label for="newUnit">Unidad</label>
+            <select id="newUnit">
+              <option value="mg">mg</option>
+              <option value="ml">ml</option>
+              <option value="mcg">mcg</option>
+              <option value="comprimidos">comprimidos</option>
+              <option value="gotas">gotas</option>
+              <option value="UI">UI</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="newFrequency">Frecuencia</label>
+          <input type="text" id="newFrequency" value="Cada 12 horas">
+        </div>
+
+        <div class="form-group">
+          <label for="doseReason">Motivo del Ajuste Clínico *</label>
+          <input type="text" id="doseReason" required value="Titulación de dosis por respuesta clínica">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="btnCancelDosage">Cancelar</button>
+          <button type="submit" class="btn-primary">Actualizar Dosis</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PRINT RECETA MODAL -->
+  <div id="printModal" class="modal-overlay hidden">
+    <div class="modal-box modal-box-lg">
+      <div class="modal-header print-hide">
+        <h3>Ficha Médica y Receta de Prescripción</h3>
+        <div>
+          <button type="button" class="btn-primary-sm" onclick="window.print()">Imprimir / PDF</button>
+          <button type="button" class="btn-close" id="btnClosePrintModal">&times;</button>
+        </div>
+      </div>
+      <div id="prescriptionPrintable" class="printable-sheet">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

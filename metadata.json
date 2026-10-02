@@ -1,0 +1,6 @@
+{
+  "name": "MedControl Doctor - Registro y Dosificación de Pacientes",
+  "description": "Sistema clínico exclusivo para doctores: administración de pacientes, números de contacto, ID de registro y control de dosis de medicamentos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

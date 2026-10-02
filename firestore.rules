@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedDoctor() {
+      return isSignedIn();
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'joelvalenzuela0999@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation helper for Patient
+    function isValidPatient(data) {
+      return data.keys().hasAll([
+        'registrationId', 'firstName', 'lastName', 'phone',
+        'medicationName', 'medicationAmount', 'medicationUnit', 'doctorId'
+      ]) &&
+      data.registrationId is string && data.registrationId.size() > 0 && data.registrationId.size() <= 64 &&
+      data.firstName is string && data.firstName.size() > 0 && data.firstName.size() <= 100 &&
+      data.lastName is string && data.lastName.size() > 0 && data.lastName.size() <= 100 &&
+      data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30 &&
+      data.medicationName is string && data.medicationName.size() > 0 && data.medicationName.size() <= 150 &&
+      data.medicationAmount is number && data.medicationAmount > 0 &&
+      data.medicationUnit is string && data.medicationUnit.size() > 0 && data.medicationUnit.size() <= 20 &&
+      data.doctorId is string && data.doctorId == request.auth.uid &&
+      (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+      (!('age' in data) || (data.age is number && data.age >= 0 && data.age <= 130)) &&
+      (!('gender' in data) || (data.gender is string && data.gender in ['Masculino', 'Femenino', 'Otro'])) &&
+      (!('allergies' in data) || (data.allergies is string && data.allergies.size() <= 500)) &&
+      (!('diagnosis' in data) || (data.diagnosis is string && data.diagnosis.size() <= 500)) &&
+      (!('medicationFrequency' in data) || (data.medicationFrequency is string && data.medicationFrequency.size() <= 150)) &&
+      (!('medicationRoute' in data) || (data.medicationRoute is string && data.medicationRoute.size() <= 50)) &&
+      (!('medicationInstructions' in data) || (data.medicationInstructions is string && data.medicationInstructions.size() <= 1000)) &&
+      (!('status' in data) || (data.status is string && data.status in ['activo', 'en_observacion', 'completado', 'suspendido'])) &&
+      (!('clinicalNotes' in data) || (data.clinicalNotes is string && data.clinicalNotes.size() <= 2000)) &&
+      (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
+      (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
+    }
+
+    // Validation helper for DosageLog
+    function isValidDosageLog(data) {
+      return data.keys().hasAll(['medicationName', 'amount', 'unit', 'doctorId', 'timestamp']) &&
+      data.medicationName is string && data.medicationName.size() > 0 && data.medicationName.size() <= 150 &&
+      data.amount is number && data.amount > 0 &&
+      data.unit is string && data.unit.size() > 0 && data.unit.size() <= 20 &&
+      data.doctorId is string && data.doctorId == request.auth.uid &&
+      data.timestamp is string && data.timestamp.size() <= 64 &&
+      (!('frequency' in data) || (data.frequency is string && data.frequency.size() <= 150)) &&
+      (!('route' in data) || (data.route is string && data.route.size() <= 50)) &&
+      (!('reasonForChange' in data) || (data.reasonForChange is string && data.reasonForChange.size() <= 300)) &&
+      (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isBootstrappedAdmin());
+      allow write: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    // Patients Collection
+    match /patients/{patientId} {
+      // Secure read: Only doctor owner or bootstrapped admin can read
+      allow get: if isVerifiedDoctor() && isValidId(patientId) && (existing().doctorId == request.auth.uid || isBootstrappedAdmin());
+      allow list: if isVerifiedDoctor() && (resource.data.doctorId == request.auth.uid || isBootstrappedAdmin());
+
+      // Create: strictly validated
+      allow create: if isVerifiedDoctor() &&
+                       isValidId(patientId) &&
+                       isValidPatient(incoming()) &&
+                       incoming().doctorId == request.auth.uid;
+
+      // Update: doctor can update fields without tampering with doctorId or createdAt
+      allow update: if isVerifiedDoctor() &&
+                       isValidId(patientId) &&
+                       isValidPatient(incoming()) &&
+                       (existing().doctorId == request.auth.uid || isBootstrappedAdmin()) &&
+                       incoming().doctorId == existing().doctorId;
+
+      // Delete: only doctor owner or admin
+      allow delete: if isVerifiedDoctor() &&
+                       isValidId(patientId) &&
+                       (existing().doctorId == request.auth.uid || isBootstrappedAdmin());
+
+      // Subcollection: Dosage Logs
+      match /dosageLogs/{dosageLogId} {
+        allow get: if isVerifiedDoctor() &&
+                      isValidId(dosageLogId) &&
+                      (get(/databases/$(database)/documents/patients/$(patientId)).data.doctorId == request.auth.uid || isBootstrappedAdmin());
+
+        allow list: if isVerifiedDoctor() &&
+                       (resource.data.doctorId == request.auth.uid || isBootstrappedAdmin());
+
+        allow create: if isVerifiedDoctor() &&
+                         isValidId(dosageLogId) &&
+                         isValidDosageLog(incoming()) &&
+                         exists(/databases/$(database)/documents/patients/$(patientId)) &&
+                         (get(/databases/$(database)/documents/patients/$(patientId)).data.doctorId == request.auth.uid || isBootstrappedAdmin());
+
+        allow update, delete: if isVerifiedDoctor() &&
+                                 isValidId(dosageLogId) &&
+                                 (existing().doctorId == request.auth.uid || isBootstrappedAdmin());
+      }
+    }
+  }
+}

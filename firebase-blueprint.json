@@ -1,0 +1,192 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Médico administrador único del sistema con acceso completo",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Correo electrónico del médico administrador"
+        },
+        "role": {
+          "type": "string",
+          "description": "Rol en el sistema",
+          "enum": ["admin", "doctor"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Fecha y hora de registro de permisos"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Expediente del paciente, datos de contacto y prescripción médica activa",
+      "type": "object",
+      "properties": {
+        "registrationId": {
+          "type": "string",
+          "description": "Identificador único de registro del paciente (ej: PAC-2026-001)",
+          "maxLength": 64
+        },
+        "firstName": {
+          "type": "string",
+          "description": "Nombres del paciente",
+          "maxLength": 100
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Apellidos del paciente",
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "description": "Número telefónico del paciente",
+          "maxLength": 30
+        },
+        "email": {
+          "type": "string",
+          "description": "Correo electrónico del paciente opcional",
+          "maxLength": 100
+        },
+        "age": {
+          "type": "number",
+          "description": "Edad del paciente en años"
+        },
+        "gender": {
+          "type": "string",
+          "description": "Género del paciente",
+          "enum": ["Masculino", "Femenino", "Otro"]
+        },
+        "allergies": {
+          "type": "string",
+          "description": "Alergias conocidas a fármacos o sustancias",
+          "maxLength": 500
+        },
+        "diagnosis": {
+          "type": "string",
+          "description": "Diagnóstico médico o motivo de consulta",
+          "maxLength": 500
+        },
+        "medicationName": {
+          "type": "string",
+          "description": "Nombre del medicamento suministrado",
+          "maxLength": 150
+        },
+        "medicationAmount": {
+          "type": "number",
+          "description": "Cantidad de medicamento suministrado"
+        },
+        "medicationUnit": {
+          "type": "string",
+          "description": "Unidad de medida del medicamento",
+          "enum": ["mg", "ml", "mcg", "comprimidos", "gotas", "UI", "g", "ampollas"]
+        },
+        "medicationFrequency": {
+          "type": "string",
+          "description": "Frecuencia o posología de administración",
+          "maxLength": 150
+        },
+        "medicationRoute": {
+          "type": "string",
+          "description": "Vía de administración",
+          "enum": ["Oral", "Intravenosa (IV)", "Intramuscular (IM)", "Subcutánea", "Tópica", "Inhalatoria", "Sublingual"]
+        },
+        "medicationInstructions": {
+          "type": "string",
+          "description": "Indicaciones de toma para el paciente",
+          "maxLength": 1000
+        },
+        "status": {
+          "type": "string",
+          "description": "Estado clínico del tratamiento",
+          "enum": ["activo", "en_observacion", "completado", "suspendido"]
+        },
+        "clinicalNotes": {
+          "type": "string",
+          "description": "Notas clínicas y evolución del doctor",
+          "maxLength": 2000
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "UID de Firebase Auth del doctor administrador responsable"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp de creación del expediente"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp de última modificación"
+        }
+      },
+      "required": ["registrationId", "firstName", "lastName", "phone", "medicationName", "medicationAmount", "medicationUnit", "doctorId"]
+    },
+    "DosageLog": {
+      "title": "DosageLog",
+      "description": "Registro histórico de cada suministro o modificación de dosis del paciente",
+      "type": "object",
+      "properties": {
+        "medicationName": {
+          "type": "string",
+          "description": "Nombre del fármaco al momento del ajuste",
+          "maxLength": 150
+        },
+        "amount": {
+          "type": "number",
+          "description": "Cantidad suministrada"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unidad del fármaco",
+          "enum": ["mg", "ml", "mcg", "comprimidos", "gotas", "UI", "g", "ampollas"]
+        },
+        "frequency": {
+          "type": "string",
+          "description": "Frecuencia indicada",
+          "maxLength": 150
+        },
+        "route": {
+          "type": "string",
+          "description": "Vía de administración",
+          "enum": ["Oral", "Intravenosa (IV)", "Intramuscular (IM)", "Subcutánea", "Tópica", "Inhalatoria", "Sublingual"]
+        },
+        "reasonForChange": {
+          "type": "string",
+          "description": "Motivo clínico del ajuste",
+          "maxLength": 300
+        },
+        "notes": {
+          "type": "string",
+          "description": "Observaciones de tolerancia o respuesta",
+          "maxLength": 1000
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "UID del doctor que suministró o modificó la dosis"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Fecha y hora del registro del suministro"
+        }
+      },
+      "required": ["medicationName", "amount", "unit", "doctorId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Lista de administradores médicos autorizados para gestionar la clínica"
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Expedientes clínicos de pacientes registrados por el doctor"
+    },
+    "/patients/{patientId}/dosageLogs/{dosageLogId}": {
+      "schema": "DosageLog",
+      "description": "Historial de modificaciones y suministros de medicamentos por paciente"
+    }
+  }
+}
